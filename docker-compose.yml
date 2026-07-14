@@ -1,0 +1,49 @@
+version: "3.8"
+
+services:
+  signal-api:
+    image: bbernhard/signal-cli-rest-api:latest
+    container_name: signal-api
+    environment:
+      - MODE=json-rpc          # required for the /v1/receive websocket used by the bot
+      # - AUTO_RECEIVE_SCHEDULE=* * * * *   # keep-alive, optional
+    volumes:
+      - signal-data:/home/.local/share/signal-cli
+    ports:
+      - "8080:8080"            # exposed mainly for the one-time QR-link step; safe to remove after linking
+    restart: unless-stopped
+    networks:
+      - duty-net
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: duty-ollama
+    volumes:
+      - ollama-data:/root/.ollama
+    restart: unless-stopped
+    networks:
+      - duty-net
+  bot:
+    build: ./bot
+    container_name: duty-bot
+    env_file:
+      - .env
+    depends_on:
+      - signal-api
+      - ollama
+    volumes:
+      - bot-data:/data          # sqlite db + tmp audio files
+      - whisper-cache:/root/.cache/huggingface   # persist downloaded whisper model
+    restart: unless-stopped
+    networks:
+      - duty-net
+
+networks:
+  duty-net:
+    driver: bridge
+
+volumes:
+  signal-data:
+  bot-data:
+  whisper-cache:
+  ollama-data:
